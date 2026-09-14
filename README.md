@@ -1,1 +1,1 @@
-Learning POSTGRESS SQP 
+Learning POSTGRESS SQL 
