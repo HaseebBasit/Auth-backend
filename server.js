@@ -17,7 +17,9 @@ app.use(cors());
 app.use(express.json());
 
 
-// ==================== EMAIL SETUP ====================
+// ======================================================
+// EMAIL SETUP
+// ======================================================
 
 const transporter = nodemailer.createTransport({
 
@@ -35,7 +37,9 @@ const transporter = nodemailer.createTransport({
 });
 
 
-// ==================== TEST ROUTE ====================
+// ======================================================
+// TEST ROUTE
+// ======================================================
 
 app.get("/", (req, res) => {
 
@@ -44,7 +48,9 @@ app.get("/", (req, res) => {
 });
 
 
-// ==================== CREATE USER ====================
+// ======================================================
+// CREATE USER
+// ======================================================
 
 app.post("/user/create", async (req, res) => {
 
@@ -52,18 +58,19 @@ app.post("/user/create", async (req, res) => {
 
     try {
 
-        // Check user already exists
+        // Check if user already exists
 
         const userCheck = await db.query(
             "SELECT * FROM users WHERE email = $1",
             [email]
         );
 
-
         if (userCheck.rows.length > 0) {
 
             return res.status(400).json({
+
                 message: "User already exists"
+
             });
 
         }
@@ -121,7 +128,9 @@ app.post("/user/create", async (req, res) => {
 });
 
 
-// ==================== LOGIN ====================
+// ======================================================
+// LOGIN
+// ======================================================
 
 app.post("/user/login", async (req, res) => {
 
@@ -222,7 +231,9 @@ app.post("/user/login", async (req, res) => {
 });
 
 
-// ==================== SEND OTP ====================
+// ======================================================
+// SEND EMAIL VERIFICATION OTP
+// ======================================================
 
 app.post("/otp/send", async (req, res) => {
 
@@ -230,65 +241,81 @@ app.post("/otp/send", async (req, res) => {
 
     try {
 
-        // ==================== CHECK USER ====================
+        // Check user
 
         const userResult = await db.query(
+
             "SELECT * FROM users WHERE email = $1",
+
             [email]
+
         );
+
 
         if (userResult.rows.length === 0) {
 
             return res.status(404).json({
+
                 message: "User not found"
+
             });
 
         }
 
 
-        // ==================== SECURE OTP ====================
-
         // Generate secure 6 digit OTP
 
         const otp = crypto
+
             .randomInt(100000, 1000000)
+
             .toString();
 
 
         // Hash OTP
 
         const codeHash = crypto
+
             .createHash("sha256")
+
             .update(otp)
+
             .digest("hex");
 
 
         // OTP expires after 10 minutes
 
         const expiresAt = new Date(
+
             Date.now() + 10 * 60 * 1000
+
         );
 
 
-        // ==================== SAVE OTP ====================
+        // Save OTP
 
         await db.query(
 
-            `INSERT INTO otp
+            `INSERT INTO verification_codes
             (email, code_hash, purpose, expires_at)
             VALUES ($1, $2, $3, $4)`,
 
             [
+
                 email,
+
                 codeHash,
+
                 "email_verification",
+
                 expiresAt
+
             ]
 
         );
 
 
-        // ==================== SEND EMAIL ====================
+        // Send email
 
         await transporter.sendMail({
 
@@ -332,18 +359,15 @@ app.post("/otp/send", async (req, res) => {
         });
 
 
-        // ==================== SUCCESS ====================
-
         res.json({
 
             message: "OTP sent successfully"
 
         });
 
+    }
 
-    } catch (err) {
-
-        // ==================== ERROR ====================
+    catch (err) {
 
         console.log("================================");
         console.log("SEND OTP ERROR");
@@ -351,7 +375,6 @@ app.post("/otp/send", async (req, res) => {
         console.log("Code:", err.code);
         console.log("Response:", err.response);
         console.log("================================");
-
 
         res.status(500).json({
 
@@ -363,7 +386,10 @@ app.post("/otp/send", async (req, res) => {
 
 });
 
-// ==================== VERIFY OTP ====================
+
+// ======================================================
+// VERIFY EMAIL OTP
+// ======================================================
 
 app.post("/otp/verify", async (req, res) => {
 
@@ -371,11 +397,11 @@ app.post("/otp/verify", async (req, res) => {
 
     try {
 
-        // Get latest unused OTP
+        // Get latest unused email verification OTP
 
         const result = await db.query(
 
-            `SELECT * FROM otp
+            `SELECT * FROM verification_codes
              WHERE email = $1
              AND purpose = $2
              AND used_at IS NULL
@@ -383,8 +409,11 @@ app.post("/otp/verify", async (req, res) => {
              LIMIT 1`,
 
             [
+
                 email,
+
                 "email_verification"
+
             ]
 
         );
@@ -426,8 +455,11 @@ app.post("/otp/verify", async (req, res) => {
         // Hash entered OTP
 
         const enteredHash = crypto
+
             .createHash("sha256")
+
             .update(otp)
+
             .digest("hex");
 
 
@@ -454,7 +486,7 @@ app.post("/otp/verify", async (req, res) => {
 
         await db.query(
 
-            `UPDATE otp
+            `UPDATE verification_codes
              SET used_at = NOW()
              WHERE id = $1`,
 
@@ -499,12 +531,418 @@ app.post("/otp/verify", async (req, res) => {
 });
 
 
-// ==================== START SERVER ====================
+// ======================================================
+// FORGOT PASSWORD - SEND OTP
+// ======================================================
 
-app.listen(5050, () => {
+app.post("/password/forgot", async (req, res) => {
+
+    const { email } = req.body;
+
+    try {
+
+        // Check user
+
+        const userResult = await db.query(
+
+            "SELECT * FROM users WHERE email = $1",
+
+            [email]
+
+        );
+
+
+        if (userResult.rows.length === 0) {
+
+            return res.status(404).json({
+
+                message: "User not found"
+
+            });
+
+        }
+
+
+        // Generate secure 6 digit OTP
+
+        const otp = crypto
+
+            .randomInt(100000, 1000000)
+
+            .toString();
+
+
+        // Hash OTP
+
+        const codeHash = crypto
+
+            .createHash("sha256")
+
+            .update(otp)
+
+            .digest("hex");
+
+
+        // OTP expires after 10 minutes
+
+        const expiresAt = new Date(
+
+            Date.now() + 10 * 60 * 1000
+
+        );
+
+
+        // Save password reset OTP
+
+        await db.query(
+
+            `INSERT INTO verification_codes
+            (email, code_hash, purpose, expires_at)
+            VALUES ($1, $2, $3, $4)`,
+
+            [
+
+                email,
+
+                codeHash,
+
+                "password_reset",
+
+                expiresAt
+
+            ]
+
+        );
+
+
+        // Send email
+
+        await transporter.sendMail({
+
+            from: `"Your App" <${process.env.SMTP_FROM}>`,
+
+            to: email,
+
+            subject: "Password Reset OTP",
+
+            html: `
+
+                <div style="
+                    font-family: Arial, sans-serif;
+                    padding: 30px;
+                ">
+
+                    <h2>Password Reset</h2>
+
+                    <p>Your password reset OTP is:</p>
+
+                    <h1 style="
+                        letter-spacing: 8px;
+                        text-align: center;
+                    ">
+                        ${otp}
+                    </h1>
+
+                    <p>
+                        This OTP will expire in 10 minutes.
+                    </p>
+
+                    <p>
+                        If you did not request a password reset,
+                        you can ignore this email.
+                    </p>
+
+                </div>
+
+            `
+
+        });
+
+
+        res.json({
+
+            message: "Password reset OTP sent successfully"
+
+        });
+
+    }
+
+    catch (err) {
+
+        console.log("Forgot password error:", err);
+
+        res.status(500).json({
+
+            message: "Failed to send password reset OTP"
+
+        });
+
+    }
+
+});
+
+
+// ======================================================
+// VERIFY FORGOT PASSWORD OTP
+// ======================================================
+
+app.post("/password/verify", async (req, res) => {
+
+    const { email, otp } = req.body;
+
+    try {
+
+        // Get latest unused password reset OTP
+
+        const result = await db.query(
+
+            `SELECT * FROM verification_codes
+             WHERE email = $1
+             AND purpose = $2
+             AND used_at IS NULL
+             ORDER BY created_at DESC
+             LIMIT 1`,
+
+            [
+
+                email,
+
+                "password_reset"
+
+            ]
+
+        );
+
+
+        if (result.rows.length === 0) {
+
+            return res.status(400).json({
+
+                message: "OTP not found"
+
+            });
+
+        }
+
+
+        const otpData = result.rows[0];
+
+
+        // Check expiry
+
+        if (
+
+            new Date() >
+
+            new Date(otpData.expires_at)
+
+        ) {
+
+            return res.status(400).json({
+
+                message: "OTP expired"
+
+            });
+
+        }
+
+
+        // Hash entered OTP
+
+        const enteredHash = crypto
+
+            .createHash("sha256")
+
+            .update(otp)
+
+            .digest("hex");
+
+
+        // Compare OTP
+
+        if (
+
+            enteredHash !==
+
+            otpData.code_hash
+
+        ) {
+
+            return res.status(400).json({
+
+                message: "Invalid OTP"
+
+            });
+
+        }
+
+
+        // Mark OTP as used
+
+        await db.query(
+
+            `UPDATE verification_codes
+             SET used_at = NOW()
+             WHERE id = $1`,
+
+            [otpData.id]
+
+        );
+
+
+        res.json({
+
+            message: "OTP verified successfully"
+
+        });
+
+    }
+
+    catch (err) {
+
+        console.log(
+
+            "Verify password OTP error:",
+
+            err
+
+        );
+
+        res.status(500).json({
+
+            message: "Server error"
+
+        });
+
+    }
+
+});
+
+
+// ======================================================
+// RESET PASSWORD / SET NEW PASSWORD
+// ======================================================
+
+app.post("/password/reset", async (req, res) => {
+
+    const { email, newPassword } = req.body;
+
+    try {
+
+        // Check user
+
+        const userResult = await db.query(
+
+            "SELECT * FROM users WHERE email = $1",
+
+            [email]
+
+        );
+
+
+        if (userResult.rows.length === 0) {
+
+            return res.status(404).json({
+
+                message: "User not found"
+
+            });
+
+        }
+
+
+        // Validate password
+
+        if (
+
+            !newPassword ||
+
+            newPassword.length < 6
+
+        ) {
+
+            return res.status(400).json({
+
+                message:
+                    "Password must be at least 6 characters"
+
+            });
+
+        }
+
+
+        // Hash new password
+
+        const hashedPassword = await bcrypt.hash(
+
+            newPassword,
+
+            10
+
+        );
+
+
+        // Update password
+
+        await db.query(
+
+            `UPDATE users
+             SET password = $1
+             WHERE email = $2`,
+
+            [
+
+                hashedPassword,
+
+                email
+
+            ]
+
+        );
+
+
+        res.json({
+
+            message: "Password reset successfully"
+
+        });
+
+    }
+
+    catch (err) {
+
+        console.log(
+
+            "Reset password error:",
+
+            err
+
+        );
+
+        res.status(500).json({
+
+            message: "Server error"
+
+        });
+
+    }
+
+});
+
+
+// ======================================================
+// START SERVER
+// ======================================================
+
+const PORT = process.env.PORT || 5050;
+
+app.listen(PORT, () => {
 
     console.log(
-        "Server is running on port 5050"
+
+        `Server is running on port ${PORT}`
+
     );
 
 });
+
