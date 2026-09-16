@@ -1,472 +1,510 @@
-import express, { response } from "express";
-import morgan from "morgan";
+import express from "express";
 import cors from "cors";
-<<<<<<< HEAD
-import pool from "./src/db/db.js";
-import bcrypt from "bcrypt"
-=======
-import dbConfig from "./src/db/db.js";
+import bcrypt from "bcryptjs";
+import crypto from "crypto";
+import nodemailer from "nodemailer";
+import dotenv from "dotenv";
+import db from "./src/db/db.js";
 
->>>>>>> e66d1b43af7ed3a5ce417d1823b630375bbb7379
-const port = 5050;
-const server = express();
+dotenv.config();
 
-server.use(cors());
-server.use(morgan("dev"));
-server.use(express.json());
+console.log("SMTP USER:", process.env.SMTP_USER);
+console.log("SMTP PASSWORD EXISTS:", !!process.env.SMTP_PASSWORD);
 
-<<<<<<< HEAD
+const app = express();
 
-// // Add user
-// server.post("/user/add", async (req, res) => {
-//     const { username, email, age } = req.body;
-
-//     console.log("Body:", username, email, age);
-
-//     try {
-//         const addQuery = `
-//             INSERT INTO users(username, email, age)
-//             VALUES($1, $2, $3)
-//             RETURNING *
-//         `;
-
-//         const apiRes = await pool.query(
-//             addQuery,
-//             [username, email, age]
-//         );
-
-//         console.log("Res:", apiRes.rows);
-
-//         return res.status(200).send({
-//             status: true,
-//             message: "User Added",
-//             data: apiRes.rows[0]
-//         });
-
-//     } catch (error) {
-//         console.log("Err while adding data:", error);
-
-//         return res.status(500).send({
-//             status: false,
-//             message: "User failed to add",
-//             error: error.message
-//         });
-//     }
-// });
+app.use(cors());
+app.use(express.json());
 
 
-// // Fetch all users
-// server.get("/user/fetch/all", async (req, res) => {
-//     try {
-//         const apiRes = await pool.query("SELECT * FROM users");
+// ==================== EMAIL SETUP ====================
 
-//         console.log("Res:", apiRes.rows);
+const transporter = nodemailer.createTransport({
 
-//         return res.status(200).send({
-//             status: true,
-//             message: "Users",
-//             data: apiRes.rows
-//         });
+    host: process.env.SMTP_HOST,
 
-//     } catch (error) {
-//         console.log("Err while fetching users data:", error);
+    port: Number(process.env.SMTP_PORT),
 
-//         return res.status(500).send({
-//             status: false,
-//             message: "Internal server error!",
-//             error: error.message
-//         });
-//     }
-// });
+    secure: false,
 
-// // Update user
-// server.put("/user/update", async (req, res) => {
-//     const { id, username, email, age } = req.body;
-
-//     try {
-//         const apiRes = await pool.query(
-//             `UPDATE users SET
-//                 username = $1,
-//                 email = $2,
-//                 age = $3
-//              WHERE id = $4
-//              RETURNING *`,
-//             [username, email, age, id]
-//         );
-
-//         console.log("Api res:", apiRes.rows);
-
-//         if (apiRes.rows.length === 0) {
-//             return res.status(404).send({
-//                 status: false,
-//                 message: "User not found"
-//             });
-//         }
-
-//         return res.status(200).send({
-//             status: true,
-//             message: "User updated",
-//             data: apiRes.rows[0]
-//         });
-
-//     } catch (error) {
-//         console.log("Err while updating user:", error);
-
-//         return res.status(500).send({
-//             status: false,
-//             message: "Internal server error!",
-//             error: error.message
-//         });
-//     }
-// });
-
-// // fetch data by ID 
-// server.get("/user/fetch/:uid", async (req, res) => {
-//     const {uid}=req.params;
-//     console.log("uid:",uid);
-
-//     try {
-//         const apiRes = await pool.query(
-//             `SELECT * FROM users WHERE id=$1`,
-//             [uid],
-//         );
-
-//         console.log("Api res:", apiRes);
-
-//         if (apiRes.rows.length === 0) {
-//             return res.status(404).send({
-//                 status: false,
-//                 message: "User not found"
-//             });
-//         }
-
-//         return res.status(200).send({
-//             status: true,
-//             message: "User fetched",
-//             data: apiRes.rows[0]
-//         });
-
-//     } catch (error) {
-//         console.log("Err while fetching user:", error);
-
-//         return res.status(500).send({
-//             status: false,
-//             message: "Internal server error!",
-//             error: error.message
-//         });
-//     }
-// });
-
-// // deleteing data by ID 
-// server.delete("/user/delete/:uid", async (req, res) => {
-//     const {uid}=req.params;
-//     console.log("uid:",uid);
-
-//     try {
-//         const apiRes = await pool.query(
-//             `DELETE FROM users WHERE id=$1 RETURNING *`,
-//             [uid],
-//         );
-
-//         console.log("Api res:", apiRes);
-
-//         if (apiRes.rows.length === 0) {
-//             return res.status(404).send({
-//                 status: false,
-//                 message: "User not found"
-//             });
-//         }
-
-//         return res.status(200).send({
-//             status: true,
-//             message: "deleted",
-//             data: apiRes.rows[0]
-//         });
-
-//     } catch (error) {
-//         console.log("Err while deleting user:", error);
-
-//         return res.status(500).send({
-//             status: false,
-//             message: "Internal server error!",
-//             error: error.message
-//         });
-//     }
-// });
-
-// sign up 
-
-
-// const bcrypt = require("bcrypt");
-
-// Sign up
-server.post("/user/signup", async (req, res) => {
-    const { firstname, lastname, username, email, password } = req.body;
-
-    try {
-        // Hash password
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        const addQuery = `
-            INSERT INTO users (firstname, lastname, username, email, password)
-            VALUES ($1, $2, $3, $4, $5)
-            RETURNING id, firstname, lastname, username, email
-        `;
-
-        const apiRes = await pool.query(addQuery, [
-            firstname,
-            lastname,
-            username,
-            email,
-            hashedPassword
-        ]);
-
-        return res.status(201).send({
-            status: true,
-            message: "User signed-up",
-            data: apiRes.rows[0]
-        });
-
-    } catch (error) {
-        console.log("Err while signing up:", error);
-
-        return res.status(500).send({
-            status: false,
-            message: "User failed to signup",
-            error: error.message
-        });
-=======
-// Note: Add data api...!
-server.post("/user/add", async (req, res) => {
-  const { username, email, age } = req.body;
-  console.log("Body:", username, email, age);
-
-  try {
-    const apiRes = await dbConfig.query(
-      "INSERT INTO users(username, email, age) VALUES($1, $2, $3) RETURNING *",
-      [username, email, age],
-    );
-    console.log("Res:", apiRes);
-
-    if (apiRes?.rows) {
-      return res.status(200).send({
-        status: true,
-        message: "User added!",
-        data: apiRes?.rows[0],
-      });
->>>>>>> e66d1b43af7ed3a5ce417d1823b630375bbb7379
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASSWORD
     }
-  } catch (error) {
-    console.log("Err while adding data:", error);
-    return res.status(500).send({
-      status: false,
-      message: "Internal server error!",
-    });
-  }
+
 });
 
-<<<<<<< HEAD
-// Login
-server.post("/user/login", async (req, res) => {
-    const { email, password } = req.body;
 
- 
-    if (!email || !password) {
-        return res.status(400).send({
-            status: false,
-            message: "Email and password are required"
-        });
-    }
+// ==================== TEST ROUTE ====================
+
+app.get("/", (req, res) => {
+
+    res.send("Server is running!");
+
+});
+
+
+// ==================== CREATE USER ====================
+
+app.post("/user/create", async (req, res) => {
+
+    const { name, email, password } = req.body;
 
     try {
-        
-        const query = `
-            SELECT id, firstname, lastname, username, email, password
-            FROM users
-            WHERE email = $1
-        `;
 
-        const apiRes = await pool.query(query, [email]);
+        // Check user already exists
 
-
-        if (apiRes.rows.length === 0) {
-            return res.status(401).send({
-                status: false,
-                message: "Invalid email or password"
-            });
-        }
-
-        const user = apiRes.rows[0];
-        const isPasswordValid = await bcrypt.compare(
-            password,
-            user.password
+        const userCheck = await db.query(
+            "SELECT * FROM users WHERE email = $1",
+            [email]
         );
 
-        if (!isPasswordValid) {
-            return res.status(401).send({
-                status: false,
-                message: "Invalid email or password"
+
+        if (userCheck.rows.length > 0) {
+
+            return res.status(400).json({
+                message: "User already exists"
             });
+
         }
-        // delete user.password;
 
-        return res.status(200).send({
-            status: true,
+
+        // Hash password
+
+        const hashedPassword = await bcrypt.hash(
+            password,
+            10
+        );
+
+
+        // Create user
+
+        const result = await db.query(
+
+            `INSERT INTO users
+            (name, email, password, is_verified)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id, name, email, is_verified, created_at`,
+
+            [
+                name,
+                email,
+                hashedPassword,
+                false
+            ]
+
+        );
+
+
+        res.status(201).json({
+
+            message: "User created successfully",
+
+            user: result.rows[0]
+
+        });
+
+    }
+
+    catch (err) {
+
+        console.log("Create user error:", err);
+
+        res.status(500).json({
+
+            message: "Server error"
+
+        });
+
+    }
+
+});
+
+
+// ==================== LOGIN ====================
+
+app.post("/user/login", async (req, res) => {
+
+    const { email, password } = req.body;
+
+    try {
+
+        // Find user
+
+        const result = await db.query(
+
+            "SELECT * FROM users WHERE email = $1",
+
+            [email]
+
+        );
+
+
+        if (result.rows.length === 0) {
+
+            return res.status(404).json({
+
+                message: "User not found"
+
+            });
+
+        }
+
+
+        const user = result.rows[0];
+
+
+        // Check password
+
+        const passwordMatch = await bcrypt.compare(
+
+            password,
+
+            user.password
+
+        );
+
+
+        if (!passwordMatch) {
+
+            return res.status(401).json({
+
+                message: "Invalid password"
+
+            });
+
+        }
+
+
+        // Check email verification
+
+        if (!user.is_verified) {
+
+            return res.status(403).json({
+
+                message: "Please verify your email first"
+
+            });
+
+        }
+
+
+        res.json({
+
             message: "Login successful",
-            data: user
+
+            user: {
+
+                id: user.id,
+
+                name: user.name,
+
+                email: user.email
+
+            }
+
         });
 
-    } catch (error) {
-        console.log("Error while logging in:", error);
-
-        return res.status(500).send({
-            status: false,
-            message: "Login failed"
-        });
-=======
-// Note: Fetch all users data api...!
-server.get("/user/fetch/all", async (req, res) => {
-  try {
-    const apiRes = await dbConfig.query("SELECT * FROM users");
-    console.log("Res:", apiRes?.rows);
-
-    if (apiRes?.rows) {
-      return res.status(200).send({
-        status: true,
-        message: "Users",
-        data: apiRes?.rows,
-      });
     }
-  } catch (error) {
-    console.log("Err while fetching users data:", error);
-    return res.status(500).send({
-      status: false,
-      message: "Internal server error!",
-    });
-  }
+
+    catch (err) {
+
+        console.log("Login error:", err);
+
+        res.status(500).json({
+
+            message: "Server error"
+
+        });
+
+    }
+
 });
 
-// Note: Update user api...!
-server.put("/user/update", async (req, res) => {
-  const { id, username, email, age } = req.body;
 
-  try {
-    const apiRes = await dbConfig.query(
-      `UPDATE users SET
-            username = $1,
-            email = $2,
-            age = $3
-        WHERE id = $4
-        RETURNING *`,
-      [username, email, age, id],
+// ==================== SEND OTP ====================
+
+app.post("/otp/send", async (req, res) => {
+
+    const { email } = req.body;
+
+    try {
+
+        // ==================== CHECK USER ====================
+
+        const userResult = await db.query(
+            "SELECT * FROM users WHERE email = $1",
+            [email]
+        );
+
+        if (userResult.rows.length === 0) {
+
+            return res.status(404).json({
+                message: "User not found"
+            });
+
+        }
+
+
+        // ==================== SECURE OTP ====================
+
+        // Generate secure 6 digit OTP
+
+        const otp = crypto
+            .randomInt(100000, 1000000)
+            .toString();
+
+
+        // Hash OTP
+
+        const codeHash = crypto
+            .createHash("sha256")
+            .update(otp)
+            .digest("hex");
+
+
+        // OTP expires after 10 minutes
+
+        const expiresAt = new Date(
+            Date.now() + 10 * 60 * 1000
+        );
+
+
+        // ==================== SAVE OTP ====================
+
+        await db.query(
+
+            `INSERT INTO otp
+            (email, code_hash, purpose, expires_at)
+            VALUES ($1, $2, $3, $4)`,
+
+            [
+                email,
+                codeHash,
+                "email_verification",
+                expiresAt
+            ]
+
+        );
+
+
+        // ==================== SEND EMAIL ====================
+
+        await transporter.sendMail({
+
+            from: `"Your App" <${process.env.SMTP_FROM}>`,
+
+            to: email,
+
+            subject: "Email Verification OTP",
+
+            html: `
+
+                <div style="
+                    font-family: Arial, sans-serif;
+                    padding: 30px;
+                ">
+
+                    <h2>Email Verification</h2>
+
+                    <p>Your verification OTP is:</p>
+
+                    <h1 style="
+                        letter-spacing: 8px;
+                        text-align: center;
+                    ">
+                        ${otp}
+                    </h1>
+
+                    <p>
+                        This OTP will expire in 10 minutes.
+                    </p>
+
+                    <p>
+                        If you did not request this code,
+                        you can ignore this email.
+                    </p>
+
+                </div>
+
+            `
+
+        });
+
+
+        // ==================== SUCCESS ====================
+
+        res.json({
+
+            message: "OTP sent successfully"
+
+        });
+
+
+    } catch (err) {
+
+        // ==================== ERROR ====================
+
+        console.log("================================");
+        console.log("SEND OTP ERROR");
+        console.log("Message:", err.message);
+        console.log("Code:", err.code);
+        console.log("Response:", err.response);
+        console.log("================================");
+
+
+        res.status(500).json({
+
+            message: "Failed to send OTP"
+
+        });
+
+    }
+
+});
+
+// ==================== VERIFY OTP ====================
+
+app.post("/otp/verify", async (req, res) => {
+
+    const { email, otp } = req.body;
+
+    try {
+
+        // Get latest unused OTP
+
+        const result = await db.query(
+
+            `SELECT * FROM otp
+             WHERE email = $1
+             AND purpose = $2
+             AND used_at IS NULL
+             ORDER BY created_at DESC
+             LIMIT 1`,
+
+            [
+                email,
+                "email_verification"
+            ]
+
+        );
+
+
+        if (result.rows.length === 0) {
+
+            return res.status(400).json({
+
+                message: "OTP not found"
+
+            });
+
+        }
+
+
+        const otpData = result.rows[0];
+
+
+        // Check expiry
+
+        if (
+
+            new Date() >
+
+            new Date(otpData.expires_at)
+
+        ) {
+
+            return res.status(400).json({
+
+                message: "OTP expired"
+
+            });
+
+        }
+
+
+        // Hash entered OTP
+
+        const enteredHash = crypto
+            .createHash("sha256")
+            .update(otp)
+            .digest("hex");
+
+
+        // Compare OTP
+
+        if (
+
+            enteredHash !==
+
+            otpData.code_hash
+
+        ) {
+
+            return res.status(400).json({
+
+                message: "Invalid OTP"
+
+            });
+
+        }
+
+
+        // Mark OTP as used
+
+        await db.query(
+
+            `UPDATE otp
+             SET used_at = NOW()
+             WHERE id = $1`,
+
+            [otpData.id]
+
+        );
+
+
+        // Verify user
+
+        await db.query(
+
+            `UPDATE users
+             SET is_verified = true
+             WHERE email = $1`,
+
+            [email]
+
+        );
+
+
+        res.json({
+
+            message: "Email verified successfully"
+
+        });
+
+    }
+
+    catch (err) {
+
+        console.log("Verify OTP error:", err);
+
+        res.status(500).json({
+
+            message: "Server error"
+
+        });
+
+    }
+
+});
+
+
+// ==================== START SERVER ====================
+
+app.listen(5050, () => {
+
+    console.log(
+        "Server is running on port 5050"
     );
-    console.log("Api res:", apiRes);
 
-    if (apiRes.rows.length == 0) {
-      return res.status(404).send({
-        status: false,
-        message: "User not found!",
-      });
-    }
-
-    if (apiRes) {
-      return res.status(200).send({
-        status: true,
-        message: "User updated!",
-      });
-    }
-  } catch (error) {
-    console.log("Err while updating user:", error);
-    return res.status(500).send({
-      status: false,
-      message: "Internal server error!",
-    });
-  }
-});
-
-// Note: Fetch user by id api...!
-server.get("/user/fetch/:uid", async (req, res) => {
-  const { uid } = req.params;
-  console.log("Uid:", uid);
-
-  try {
-    const apiRes = await dbConfig.query("SELECT * FROM users WHERE id = $1", [
-      uid,
-    ]);
-    console.log("Api res:", apiRes);
-
-    if (apiRes.rows.length == 0) {
-      return res.status(404).send({
-        status: false,
-        message: "User not found!",
-      });
->>>>>>> e66d1b43af7ed3a5ce417d1823b630375bbb7379
-    }
-
-    if (apiRes) {
-      return res.status(200).send({
-        status: true,
-        message: "User fetched",
-        data: apiRes.rows[0],
-      });
-    }
-  } catch (error) {
-    console.log("Err while fetching user by id:", error);
-    return res.status(500).send({
-      status: false,
-      message: "Internal server error!",
-    });
-  }
-});
-
-<<<<<<< HEAD
-server.get("/session", (req,res)=>{
-    res.status(200).send(
-      "hi"
-    )
-    // res.redirect("https://github.com/Shahzadaahmed/SMIT_Batch_18/blob/master/Back-End/postgres/server.js")
-})
-
-=======
-// Note: Delete user api...!
-server.delete("/user/delete/:uid", async (req, res) => {
-  const { uid } = req.params;
-  console.log("Uid:", uid);
-
-  try {
-    // For deleting a single user...!
-    // const apiRes = await dbConfig.query(
-    //   "DELETE FROM users WHERE id = $1 RETURNING *",
-    //   [uid],
-    // );
-
-    // For deleting all users...!
-    const apiRes = await dbConfig.query("DELETE FROM users");
-    console.log("Api res:", apiRes);
-
-    if (apiRes.rows.length == 0) {
-      return res.status(404).send({
-        status: false,
-        message: "User not found!",
-      });
-    }
-
-    if (apiRes) {
-      return res.status(200).send({
-        status: true,
-        message: "User deleted",
-      });
-    }
-  } catch (error) {
-    console.log("Err while fetching user by id:", error);
-    return res.status(500).send({
-      status: false,
-      message: "Internal server error!",
-    });
-  }
-});
-
->>>>>>> e66d1b43af7ed3a5ce417d1823b630375bbb7379
-server.listen(port, () => {
-  console.log("Your Node JS server is running!");
 });
