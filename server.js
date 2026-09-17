@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
-import db from "./db.js";
+import db from "./src/db/db.js";
 
 dotenv.config();
 
