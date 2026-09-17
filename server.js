@@ -31,13 +31,20 @@ app.use(express.json());
 // ======================================================
 
 const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT),
-    secure: Number(process.env.SMTP_PORT) === 465,
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
     family: 4,
     auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASSWORD
+    }
+});
+transporter.verify((error, success) => {
+    if (error) {
+        console.log("SMTP CONNECTION ERROR:", error);
+    } else {
+        console.log("SMTP SERVER IS READY");
     }
 });
 
