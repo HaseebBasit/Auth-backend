@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import nodemailer from "nodemailer";
 import dotenv from "dotenv";
+import { Resend } from "resend";
 
 import {
     findUserByEmail,
@@ -18,35 +18,12 @@ dotenv.config();
 
 
 // ======================================================
-// ==================== EMAIL SETUP ======================
+// ==================== RESEND SETUP ====================
 // ======================================================
 
-const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD
-    },
-
-    connectionTimeout: 15000,
-    greetingTimeout: 15000,
-    socketTimeout: 20000
-});
-
-
-// Check SMTP connection
-transporter.verify((error) => {
-
-    if (error) {
-        console.log("SMTP CONNECTION ERROR:", error);
-    } else {
-        console.log("SMTP SERVER IS READY");
-    }
-
-});
+const resend = new Resend(
+    process.env.RESEND_API_KEY
+);
 
 
 // ======================================================
@@ -54,9 +31,7 @@ transporter.verify((error) => {
 // ======================================================
 
 export const home = (req, res) => {
-
     res.send("Server is running!");
-
 };
 
 
@@ -83,9 +58,6 @@ export const registerUser = async (req, res) => {
 
         }
 
-        const cleanEmail =
-            email.trim().toLowerCase();
-
         if (password.length < 8) {
 
             return res.status(400).json({
@@ -95,10 +67,10 @@ export const registerUser = async (req, res) => {
 
         }
 
+        const cleanEmail =
+            email.trim().toLowerCase();
 
-        // ==================================================
-        // CHECK EXISTING USER
-        // ==================================================
+        // Check existing user
 
         const existingUser =
             await findUserByEmail(cleanEmail);
@@ -112,10 +84,7 @@ export const registerUser = async (req, res) => {
 
         }
 
-
-        // ==================================================
-        // HASH PASSWORD
-        // ==================================================
+        // Hash password
 
         const hashedPassword =
             await bcrypt.hash(
@@ -123,10 +92,7 @@ export const registerUser = async (req, res) => {
                 10
             );
 
-
-        // ==================================================
-        // CREATE USER
-        // ==================================================
+        // Create user
 
         const user =
             await createUser(
@@ -134,7 +100,6 @@ export const registerUser = async (req, res) => {
                 cleanEmail,
                 hashedPassword
             );
-
 
         res.status(201).json({
 
@@ -159,7 +124,6 @@ export const registerUser = async (req, res) => {
         });
 
     }
-
 };
 
 
@@ -188,11 +152,6 @@ export const loginUser = async (req, res) => {
         const cleanEmail =
             email.trim().toLowerCase();
 
-
-        // ==================================================
-        // FIND USER
-        // ==================================================
-
         const users =
             await findUserByEmail(
                 cleanEmail
@@ -209,10 +168,7 @@ export const loginUser = async (req, res) => {
 
         const user = users[0];
 
-
-        // ==================================================
-        // CHECK PASSWORD
-        // ==================================================
+        // Check password
 
         const passwordMatch =
             await bcrypt.compare(
@@ -229,10 +185,7 @@ export const loginUser = async (req, res) => {
 
         }
 
-
-        // ==================================================
-        // CHECK EMAIL VERIFICATION
-        // ==================================================
+        // Check email verification
 
         if (!user.is_verified) {
 
@@ -242,11 +195,6 @@ export const loginUser = async (req, res) => {
             });
 
         }
-
-
-        // ==================================================
-        // LOGIN SUCCESS
-        // ==================================================
 
         res.json({
 
@@ -275,12 +223,11 @@ export const loginUser = async (req, res) => {
         });
 
     }
-
 };
 
 
 // ======================================================
-// ==================== SEND EMAIL OTP ===================
+// ==================== SEND EMAIL OTP ==================
 // ======================================================
 
 export const sendEmailOTP = async (req, res) => {
@@ -301,16 +248,7 @@ export const sendEmailOTP = async (req, res) => {
         const cleanEmail =
             email.trim().toLowerCase();
 
-
-        console.log(
-            "OTP REQUEST RECEIVED:",
-            cleanEmail
-        );
-
-
-        // ==================================================
-        // CHECK USER
-        // ==================================================
+        // Check user
 
         const users =
             await findUserByEmail(
@@ -326,10 +264,7 @@ export const sendEmailOTP = async (req, res) => {
 
         }
 
-
-        // ==================================================
-        // CHECK IF ALREADY VERIFIED
-        // ==================================================
+        // If already verified
 
         if (users[0].is_verified) {
 
@@ -340,10 +275,7 @@ export const sendEmailOTP = async (req, res) => {
 
         }
 
-
-        // ==================================================
-        // GENERATE OTP
-        // ==================================================
+        // Generate OTP
 
         const otp =
             crypto
@@ -353,15 +285,7 @@ export const sendEmailOTP = async (req, res) => {
                 )
                 .toString();
 
-        console.log(
-            "OTP GENERATED FOR:",
-            cleanEmail
-        );
-
-
-        // ==================================================
-        // HASH OTP
-        // ==================================================
+        // Hash OTP
 
         const codeHash =
             crypto
@@ -369,10 +293,7 @@ export const sendEmailOTP = async (req, res) => {
                 .update(otp)
                 .digest("hex");
 
-
-        // ==================================================
-        // OTP EXPIRY
-        // ==================================================
+        // OTP expires after 10 minutes
 
         const expiresAt =
             new Date(
@@ -380,14 +301,7 @@ export const sendEmailOTP = async (req, res) => {
                 10 * 60 * 1000
             );
 
-
-        // ==================================================
-        // SAVE OTP TO DATABASE
-        // ==================================================
-
-        console.log(
-            "SAVING EMAIL OTP TO DATABASE..."
-        );
+        // Save OTP in database
 
         await saveVerificationCode(
             cleanEmail,
@@ -397,119 +311,94 @@ export const sendEmailOTP = async (req, res) => {
         );
 
         console.log(
-            "EMAIL OTP SAVED TO DATABASE"
+            "EMAIL OTP SAVED FOR:",
+            cleanEmail
         );
 
+        // Send email using Resend
 
-        // ==================================================
-        // CHECK SMTP CONFIG
-        // ==================================================
+        const { data, error } =
+            await resend.emails.send({
 
-        if (
-            !process.env.SMTP_USER ||
-            !process.env.SMTP_PASSWORD ||
-            !process.env.SMTP_FROM
-        ) {
+                from:
+                    process.env.RESEND_FROM_EMAIL,
+
+                to:
+                    cleanEmail,
+
+                subject:
+                    "Email Verification OTP",
+
+                html: `
+                    <div style="
+                        font-family: Arial, sans-serif;
+                        max-width: 600px;
+                        margin: auto;
+                        padding: 30px;
+                        background: #f8fafc;
+                    ">
+
+                        <div style="
+                            background: white;
+                            padding: 30px;
+                            border-radius: 12px;
+                        ">
+
+                            <h2>
+                                Email Verification
+                            </h2>
+
+                            <p>
+                                Your verification OTP is:
+                            </p>
+
+                            <h1 style="
+                                letter-spacing: 8px;
+                                text-align: center;
+                                font-size: 36px;
+                            ">
+                                ${otp}
+                            </h1>
+
+                            <p>
+                                This OTP will expire
+                                in 10 minutes.
+                            </p>
+
+                            <p>
+                                If you did not create
+                                this account, you can
+                                safely ignore this email.
+                            </p>
+
+                        </div>
+
+                    </div>
+                `
+            });
+
+        if (error) {
 
             console.log(
-                "SMTP ENV VARIABLES ARE MISSING"
+                "RESEND EMAIL ERROR:",
+                error
             );
 
             return res.status(500).json({
                 message:
-                    "SMTP configuration is missing"
+                    "OTP saved but email could not be sent"
             });
 
         }
 
-
-        // ==================================================
-        // SEND EMAIL
-        // ==================================================
-
         console.log(
-            "SENDING EMAIL OTP..."
+            "VERIFICATION EMAIL SENT:",
+            data?.id
         );
-
-        await transporter.sendMail({
-
-            from:
-                `"SecureAuth" <${process.env.SMTP_FROM}>`,
-
-            to:
-                cleanEmail,
-
-            subject:
-                "Email Verification OTP",
-
-            html: `
-                <div style="
-                    font-family: Arial, sans-serif;
-                    background: #f4f4f4;
-                    padding: 40px;
-                ">
-
-                    <div style="
-                        max-width: 500px;
-                        margin: auto;
-                        background: white;
-                        padding: 30px;
-                        border-radius: 12px;
-                    ">
-
-                        <h2 style="
-                            color: #111827;
-                        ">
-                            Email Verification
-                        </h2>
-
-                        <p>
-                            Your verification OTP is:
-                        </p>
-
-                        <h1 style="
-                            letter-spacing: 10px;
-                            text-align: center;
-                            color: #4f46e5;
-                        ">
-                            ${otp}
-                        </h1>
-
-                        <p>
-                            This OTP will expire
-                            in 10 minutes.
-                        </p>
-
-                        <p style="
-                            color: #666;
-                            font-size: 13px;
-                        ">
-                            If you did not create this
-                            account, you can ignore
-                            this email.
-                        </p>
-
-                    </div>
-
-                </div>
-            `
-
-        });
-
-        console.log(
-            "EMAIL OTP SENT SUCCESSFULLY"
-        );
-
-
-        // ==================================================
-        // RESPONSE
-        // ==================================================
 
         res.json({
-
             message:
                 "OTP sent successfully"
-
         });
 
     }
@@ -521,14 +410,11 @@ export const sendEmailOTP = async (req, res) => {
         );
 
         res.status(500).json({
-
             message:
                 "Failed to send OTP"
-
         });
 
     }
-
 };
 
 
@@ -560,10 +446,14 @@ export const verifyEmailOTP = async (req, res) => {
         const cleanOtp =
             otp.trim();
 
+        if (cleanOtp.length !== 6) {
 
-        // ==================================================
-        // GET LATEST OTP
-        // ==================================================
+            return res.status(400).json({
+                message:
+                    "OTP must be 6 digits"
+            });
+
+        }
 
         const codes =
             await getLatestVerificationCode(
@@ -575,17 +465,14 @@ export const verifyEmailOTP = async (req, res) => {
 
             return res.status(400).json({
                 message:
-                    "OTP not found or already used"
+                    "OTP not found"
             });
 
         }
 
         const otpData = codes[0];
 
-
-        // ==================================================
-        // CHECK EXPIRY
-        // ==================================================
+        // Check expiry
 
         if (
             new Date() >
@@ -599,10 +486,7 @@ export const verifyEmailOTP = async (req, res) => {
 
         }
 
-
-        // ==================================================
-        // HASH ENTERED OTP
-        // ==================================================
+        // Hash entered OTP
 
         const enteredHash =
             crypto
@@ -610,10 +494,7 @@ export const verifyEmailOTP = async (req, res) => {
                 .update(cleanOtp)
                 .digest("hex");
 
-
-        // ==================================================
-        // COMPARE OTP
-        // ==================================================
+        // Compare OTP
 
         if (
             enteredHash !==
@@ -627,30 +508,21 @@ export const verifyEmailOTP = async (req, res) => {
 
         }
 
-
-        // ==================================================
-        // MARK OTP USED
-        // ==================================================
+        // Mark OTP as used
 
         await markVerificationCodeUsed(
             otpData.id
         );
 
-
-        // ==================================================
-        // VERIFY USER
-        // ==================================================
+        // Verify user
 
         await verifyUserEmail(
             cleanEmail
         );
 
-
         res.json({
-
             message:
                 "Email verified successfully"
-
         });
 
     }
@@ -667,12 +539,11 @@ export const verifyEmailOTP = async (req, res) => {
         });
 
     }
-
 };
 
 
 // ======================================================
-// ==================== FORGOT PASSWORD ==================
+// ==================== FORGOT PASSWORD =================
 // ======================================================
 
 export const forgotPassword = async (req, res) => {
@@ -693,16 +564,7 @@ export const forgotPassword = async (req, res) => {
         const cleanEmail =
             email.trim().toLowerCase();
 
-
-        console.log(
-            "PASSWORD RESET REQUEST:",
-            cleanEmail
-        );
-
-
-        // ==================================================
-        // CHECK USER
-        // ==================================================
+        // Check user
 
         const users =
             await findUserByEmail(
@@ -718,10 +580,7 @@ export const forgotPassword = async (req, res) => {
 
         }
 
-
-        // ==================================================
-        // GENERATE OTP
-        // ==================================================
+        // Generate OTP
 
         const otp =
             crypto
@@ -731,15 +590,7 @@ export const forgotPassword = async (req, res) => {
                 )
                 .toString();
 
-
-        console.log(
-            "PASSWORD RESET OTP GENERATED"
-        );
-
-
-        // ==================================================
-        // HASH OTP
-        // ==================================================
+        // Hash OTP
 
         const codeHash =
             crypto
@@ -747,10 +598,7 @@ export const forgotPassword = async (req, res) => {
                 .update(otp)
                 .digest("hex");
 
-
-        // ==================================================
-        // EXPIRY
-        // ==================================================
+        // Expire after 10 minutes
 
         const expiresAt =
             new Date(
@@ -758,14 +606,7 @@ export const forgotPassword = async (req, res) => {
                 10 * 60 * 1000
             );
 
-
-        // ==================================================
-        // SAVE RESET OTP
-        // ==================================================
-
-        console.log(
-            "SAVING PASSWORD RESET OTP..."
-        );
+        // Save reset OTP
 
         await saveVerificationCode(
             cleanEmail,
@@ -775,109 +616,96 @@ export const forgotPassword = async (req, res) => {
         );
 
         console.log(
-            "PASSWORD RESET OTP SAVED"
+            "PASSWORD RESET OTP SAVED FOR:",
+            cleanEmail
         );
 
+        // Send reset email
 
-        // ==================================================
-        // CHECK SMTP CONFIG
-        // ==================================================
+        const { data, error } =
+            await resend.emails.send({
 
-        if (
-            !process.env.SMTP_USER ||
-            !process.env.SMTP_PASSWORD ||
-            !process.env.SMTP_FROM
-        ) {
+                from:
+                    process.env.RESEND_FROM_EMAIL,
+
+                to:
+                    cleanEmail,
+
+                subject:
+                    "Password Reset OTP",
+
+                html: `
+                    <div style="
+                        font-family: Arial, sans-serif;
+                        max-width: 600px;
+                        margin: auto;
+                        padding: 30px;
+                        background: #f8fafc;
+                    ">
+
+                        <div style="
+                            background: white;
+                            padding: 30px;
+                            border-radius: 12px;
+                        ">
+
+                            <h2>
+                                Password Reset
+                            </h2>
+
+                            <p>
+                                Your password reset
+                                OTP is:
+                            </p>
+
+                            <h1 style="
+                                letter-spacing: 8px;
+                                text-align: center;
+                                font-size: 36px;
+                            ">
+                                ${otp}
+                            </h1>
+
+                            <p>
+                                This OTP will expire
+                                in 10 minutes.
+                            </p>
+
+                            <p>
+                                If you did not request
+                                a password reset, you
+                                can safely ignore this
+                                email.
+                            </p>
+
+                        </div>
+
+                    </div>
+                `
+            });
+
+        if (error) {
+
+            console.log(
+                "RESEND RESET EMAIL ERROR:",
+                error
+            );
 
             return res.status(500).json({
                 message:
-                    "SMTP configuration is missing"
+                    "Reset OTP saved but email could not be sent"
             });
 
         }
 
-
-        // ==================================================
-        // SEND RESET EMAIL
-        // ==================================================
-
         console.log(
-            "SENDING PASSWORD RESET EMAIL..."
+            "PASSWORD RESET EMAIL SENT:",
+            data?.id
         );
-
-        await transporter.sendMail({
-
-            from:
-                `"SecureAuth" <${process.env.SMTP_FROM}>`,
-
-            to:
-                cleanEmail,
-
-            subject:
-                "Password Reset OTP",
-
-            html: `
-                <div style="
-                    font-family: Arial, sans-serif;
-                    background: #f4f4f4;
-                    padding: 40px;
-                ">
-
-                    <div style="
-                        max-width: 500px;
-                        margin: auto;
-                        background: white;
-                        padding: 30px;
-                        border-radius: 12px;
-                    ">
-
-                        <h2>
-                            Password Reset
-                        </h2>
-
-                        <p>
-                            Your password reset OTP is:
-                        </p>
-
-                        <h1 style="
-                            letter-spacing: 10px;
-                            text-align: center;
-                            color: #4f46e5;
-                        ">
-                            ${otp}
-                        </h1>
-
-                        <p>
-                            This OTP will expire
-                            in 10 minutes.
-                        </p>
-
-                        <p style="
-                            color: #666;
-                            font-size: 13px;
-                        ">
-                            If you did not request
-                            a password reset, you can
-                            safely ignore this email.
-                        </p>
-
-                    </div>
-
-                </div>
-            `
-
-        });
-
-        console.log(
-            "PASSWORD RESET EMAIL SENT"
-        );
-
 
         res.json({
-
             message:
                 "Password reset OTP sent successfully"
-
         });
 
     }
@@ -889,14 +717,11 @@ export const forgotPassword = async (req, res) => {
         );
 
         res.status(500).json({
-
             message:
                 "Failed to send reset OTP"
-
         });
 
     }
-
 };
 
 
@@ -928,11 +753,6 @@ export const verifyPasswordOTP = async (req, res) => {
         const cleanOtp =
             otp.trim();
 
-
-        // ==================================================
-        // GET LATEST RESET OTP
-        // ==================================================
-
         const codes =
             await getLatestVerificationCode(
                 cleanEmail,
@@ -943,17 +763,14 @@ export const verifyPasswordOTP = async (req, res) => {
 
             return res.status(400).json({
                 message:
-                    "OTP not found or already used"
+                    "OTP not found"
             });
 
         }
 
         const otpData = codes[0];
 
-
-        // ==================================================
-        // CHECK EXPIRY
-        // ==================================================
+        // Check expiry
 
         if (
             new Date() >
@@ -967,10 +784,7 @@ export const verifyPasswordOTP = async (req, res) => {
 
         }
 
-
-        // ==================================================
-        // HASH OTP
-        // ==================================================
+        // Hash OTP
 
         const enteredHash =
             crypto
@@ -978,10 +792,7 @@ export const verifyPasswordOTP = async (req, res) => {
                 .update(cleanOtp)
                 .digest("hex");
 
-
-        // ==================================================
-        // COMPARE
-        // ==================================================
+        // Compare
 
         if (
             enteredHash !==
@@ -995,20 +806,14 @@ export const verifyPasswordOTP = async (req, res) => {
 
         }
 
-
-        // ==================================================
-        // GENERATE RESET TOKEN
-        // ==================================================
+        // Generate reset token
 
         const resetToken =
             crypto
                 .randomBytes(32)
                 .toString("hex");
 
-
-        // ==================================================
-        // HASH RESET TOKEN
-        // ==================================================
+        // Hash reset token
 
         const resetTokenHash =
             crypto
@@ -1016,10 +821,7 @@ export const verifyPasswordOTP = async (req, res) => {
                 .update(resetToken)
                 .digest("hex");
 
-
-        // ==================================================
-        // RESET TOKEN EXPIRY
-        // ==================================================
+        // Reset token expires in 10 minutes
 
         const resetTokenExpires =
             new Date(
@@ -1027,10 +829,7 @@ export const verifyPasswordOTP = async (req, res) => {
                 10 * 60 * 1000
             );
 
-
-        // ==================================================
-        // SAVE RESET TOKEN
-        // ==================================================
+        // Save reset token
 
         await saveResetToken(
             cleanEmail,
@@ -1038,15 +837,11 @@ export const verifyPasswordOTP = async (req, res) => {
             resetTokenExpires
         );
 
-
-        // ==================================================
-        // MARK OTP USED
-        // ==================================================
+        // Mark OTP used
 
         await markVerificationCodeUsed(
             otpData.id
         );
-
 
         res.json({
 
@@ -1061,24 +856,21 @@ export const verifyPasswordOTP = async (req, res) => {
     catch (err) {
 
         console.log(
-            "PASSWORD VERIFY ERROR:",
+            "VERIFY PASSWORD OTP ERROR:",
             err
         );
 
         res.status(500).json({
-
             message:
                 "Server error"
-
         });
 
     }
-
 };
 
 
 // ======================================================
-// ==================== RESET PASSWORD ===================
+// ==================== RESET PASSWORD ==================
 // ======================================================
 
 export const resetPassword = async (req, res) => {
@@ -1120,10 +912,7 @@ export const resetPassword = async (req, res) => {
         const cleanEmail =
             email.trim().toLowerCase();
 
-
-        // ==================================================
-        // FIND USER
-        // ==================================================
+        // Find user
 
         const users =
             await findUserByEmail(
@@ -1133,20 +922,15 @@ export const resetPassword = async (req, res) => {
         if (users.length === 0) {
 
             return res.status(404).json({
-
                 message:
                     "User not found"
-
             });
 
         }
 
         const user = users[0];
 
-
-        // ==================================================
-        // CHECK RESET TOKEN
-        // ==================================================
+        // Check reset token
 
         if (
             !user.reset_token_hash ||
@@ -1154,18 +938,13 @@ export const resetPassword = async (req, res) => {
         ) {
 
             return res.status(400).json({
-
                 message:
                     "Invalid reset token"
-
             });
 
         }
 
-
-        // ==================================================
-        // CHECK TOKEN EXPIRY
-        // ==================================================
+        // Check expiry
 
         if (
             new Date() >
@@ -1175,18 +954,13 @@ export const resetPassword = async (req, res) => {
         ) {
 
             return res.status(400).json({
-
                 message:
                     "Reset token expired"
-
             });
 
         }
 
-
-        // ==================================================
-        // HASH RESET TOKEN
-        // ==================================================
+        // Hash token
 
         const tokenHash =
             crypto
@@ -1194,10 +968,7 @@ export const resetPassword = async (req, res) => {
                 .update(resetToken)
                 .digest("hex");
 
-
-        // ==================================================
-        // COMPARE TOKEN
-        // ==================================================
+        // Compare
 
         if (
             tokenHash !==
@@ -1205,18 +976,13 @@ export const resetPassword = async (req, res) => {
         ) {
 
             return res.status(400).json({
-
                 message:
                     "Invalid reset token"
-
             });
 
         }
 
-
-        // ==================================================
-        // HASH NEW PASSWORD
-        // ==================================================
+        // Hash new password
 
         const hashedPassword =
             await bcrypt.hash(
@@ -1224,39 +990,30 @@ export const resetPassword = async (req, res) => {
                 10
             );
 
-
-        // ==================================================
-        // UPDATE PASSWORD
-        // ==================================================
+        // Update password
 
         await resetUserPassword(
             cleanEmail,
             hashedPassword
         );
 
-
         res.json({
-
             message:
                 "Password reset successfully"
-
         });
 
     }
     catch (err) {
 
         console.log(
-            "PASSWORD RESET ERROR:",
+            "RESET PASSWORD ERROR:",
             err
         );
 
         res.status(500).json({
-
             message:
                 "Server error"
-
         });
 
     }
-
 };
