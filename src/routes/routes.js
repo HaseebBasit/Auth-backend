@@ -8,7 +8,9 @@ import {
     verifyEmailOTP,
     forgotPassword,
     verifyPasswordOTP,
-    resetPassword
+    resetPassword,
+    getCurrentUser,
+    logoutUser  
 } from "../controller/controller.js";
 
 const router = express.Router();
@@ -70,5 +72,8 @@ router.post(
     resetPassword
 );
 
+router.get("/auth/me", getCurrentUser);
+
+router.post("/auth/logout", logoutUser);
 
 export default router;
