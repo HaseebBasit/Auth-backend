@@ -1039,24 +1039,32 @@ dotenv.config();
 
 
 // ======================================================
-// ==================== SMTP SETUP =======================
+// ==================== SMTP SETUP ======================
 // ======================================================
 
 const transporter = nodemailer.createTransport({
+
     host: "smtp.gmail.com",
+
     port: 587,
+
     secure: false,
+
     family: 4,
 
     auth: {
+
         user: process.env.SMTP_USER,
+
         pass: process.env.SMTP_PASS
+
     }
+
 });
 
 
 // ======================================================
-// ==================== SMTP TEST ========================
+// ==================== SMTP VERIFY =====================
 // ======================================================
 
 transporter.verify((error, success) => {
@@ -1080,7 +1088,7 @@ transporter.verify((error, success) => {
 
 
 // ======================================================
-// ==================== TEST CONTROLLER =================
+// ==================== HOME ============================
 // ======================================================
 
 export const home = (req, res) => {
@@ -1093,7 +1101,7 @@ export const home = (req, res) => {
 
 
 // ======================================================
-// ==================== CREATE USER =====================
+// ==================== REGISTER ========================
 // ======================================================
 
 export const registerUser = async (req, res) => {
@@ -1106,11 +1114,17 @@ export const registerUser = async (req, res) => {
 
     try {
 
-        if (!name || !email || !password) {
+        if (
+            !name ||
+            !email ||
+            !password
+        ) {
 
             return res.status(400).json({
+
                 message:
                     "Name, email and password are required"
+
             });
 
         }
@@ -1119,8 +1133,10 @@ export const registerUser = async (req, res) => {
         if (password.length < 8) {
 
             return res.status(400).json({
+
                 message:
                     "Password must be at least 8 characters"
+
             });
 
         }
@@ -1130,9 +1146,7 @@ export const registerUser = async (req, res) => {
             email.trim().toLowerCase();
 
 
-        // ==================================================
-        // CHECK EXISTING USER
-        // ==================================================
+        // ==================== CHECK USER ====================
 
         const existingUser =
             await findUserByEmail(
@@ -1143,16 +1157,16 @@ export const registerUser = async (req, res) => {
         if (existingUser.length > 0) {
 
             return res.status(400).json({
+
                 message:
                     "User already exists"
+
             });
 
         }
 
 
-        // ==================================================
-        // HASH PASSWORD
-        // ==================================================
+        // ==================== HASH PASSWORD ====================
 
         const hashedPassword =
             await bcrypt.hash(
@@ -1161,9 +1175,7 @@ export const registerUser = async (req, res) => {
             );
 
 
-        // ==================================================
-        // CREATE USER
-        // ==================================================
+        // ==================== CREATE USER ====================
 
         const user =
             await createUser(
@@ -1215,7 +1227,10 @@ export const loginUser = async (req, res) => {
 
     try {
 
-        if (!email || !password) {
+        if (
+            !email ||
+            !password
+        ) {
 
             return res.status(400).json({
 
@@ -1230,10 +1245,6 @@ export const loginUser = async (req, res) => {
         const cleanEmail =
             email.trim().toLowerCase();
 
-
-        // ==================================================
-        // FIND USER
-        // ==================================================
 
         const users =
             await findUserByEmail(
@@ -1257,9 +1268,7 @@ export const loginUser = async (req, res) => {
             users[0];
 
 
-        // ==================================================
-        // CHECK PASSWORD
-        // ==================================================
+        // ==================== CHECK PASSWORD ====================
 
         const passwordMatch =
             await bcrypt.compare(
@@ -1280,9 +1289,7 @@ export const loginUser = async (req, res) => {
         }
 
 
-        // ==================================================
-        // CHECK EMAIL VERIFICATION
-        // ==================================================
+        // ==================== CHECK EMAIL ====================
 
         if (!user.is_verified) {
 
@@ -1295,10 +1302,6 @@ export const loginUser = async (req, res) => {
 
         }
 
-
-        // ==================================================
-        // LOGIN SUCCESS
-        // ==================================================
 
         res.json({
 
@@ -1341,7 +1344,7 @@ export const loginUser = async (req, res) => {
 
 
 // ======================================================
-// ==================== SEND EMAIL OTP ==================
+// ==================== SEND OTP ========================
 // ======================================================
 
 export const sendEmailOTP = async (req, res) => {
@@ -1351,6 +1354,10 @@ export const sendEmailOTP = async (req, res) => {
     } = req.body;
 
     try {
+
+        // ==================================================
+        // CHECK EMAIL
+        // ==================================================
 
         if (!email) {
 
@@ -1369,7 +1376,7 @@ export const sendEmailOTP = async (req, res) => {
 
 
         // ==================================================
-        // FIND USER
+        // CHECK USER
         // ==================================================
 
         const users =
@@ -1391,7 +1398,7 @@ export const sendEmailOTP = async (req, res) => {
 
 
         // ==================================================
-        // CHECK VERIFICATION
+        // CHECK ALREADY VERIFIED
         // ==================================================
 
         if (users[0].is_verified) {
@@ -1407,7 +1414,7 @@ export const sendEmailOTP = async (req, res) => {
 
 
         // ==================================================
-        // GENERATE OTP
+        // SECURE OTP
         // ==================================================
 
         const otp =
@@ -1431,7 +1438,7 @@ export const sendEmailOTP = async (req, res) => {
 
 
         // ==================================================
-        // OTP EXPIRY - 10 MINUTES
+        // OTP EXPIRES AFTER 10 MINUTES
         // ==================================================
 
         const expiresAt =
@@ -1442,31 +1449,30 @@ export const sendEmailOTP = async (req, res) => {
 
 
         // ==================================================
-        // SAVE OTP
+        // SAVE OTP IN verification_codes
         // ==================================================
 
         await saveVerificationCode(
+
             cleanEmail,
+
             codeHash,
+
             "email_verification",
+
             expiresAt
-        );
 
-
-        console.log(
-            "EMAIL OTP SAVED FOR:",
-            cleanEmail
         );
 
 
         // ==================================================
-        // SEND OTP EMAIL
+        // SEND EMAIL
         // ==================================================
 
         await transporter.sendMail({
 
             from:
-                `"Authentication App" <${process.env.SMTP_USER}>`,
+                `"Your App" <${process.env.SMTP_USER}>`,
 
             to:
                 cleanEmail,
@@ -1478,47 +1484,39 @@ export const sendEmailOTP = async (req, res) => {
 
                 <div style="
                     font-family: Arial, sans-serif;
+                    padding: 30px;
                     max-width: 600px;
                     margin: auto;
-                    padding: 30px;
-                    background: #f8fafc;
                 ">
 
-                    <div style="
-                        background: white;
-                        padding: 30px;
-                        border-radius: 12px;
-                        border: 1px solid #e5e7eb;
+                    <h2>
+                        Email Verification
+                    </h2>
+
+                    <p>
+                        Your verification OTP is:
+                    </p>
+
+                    <h1 style="
+                        letter-spacing: 8px;
+                        text-align: center;
+                        font-size: 36px;
                     ">
 
-                        <h2>
-                            Email Verification
-                        </h2>
+                        ${otp}
 
-                        <p>
-                            Your verification OTP is:
-                        </p>
+                    </h1>
 
-                        <h1 style="
-                            letter-spacing: 8px;
-                            text-align: center;
-                            font-size: 36px;
-                        ">
-                            ${otp}
-                        </h1>
+                    <p>
+                        This OTP will expire
+                        in 10 minutes.
+                    </p>
 
-                        <p>
-                            This OTP will expire
-                            in 10 minutes.
-                        </p>
-
-                        <p>
-                            If you did not create
-                            this account, you can
-                            safely ignore this email.
-                        </p>
-
-                    </div>
+                    <p>
+                        If you did not request
+                        this code, you can ignore
+                        this email.
+                    </p>
 
                 </div>
 
@@ -1527,11 +1525,9 @@ export const sendEmailOTP = async (req, res) => {
         });
 
 
-        console.log(
-            "VERIFICATION EMAIL SENT TO:",
-            cleanEmail
-        );
-
+        // ==================================================
+        // SUCCESS
+        // ==================================================
 
         res.json({
 
@@ -1544,17 +1540,37 @@ export const sendEmailOTP = async (req, res) => {
     catch (err) {
 
         console.log(
-            "SEND EMAIL OTP ERROR:",
-            err
+            "================================"
         );
+
+        console.log(
+            "SEND OTP ERROR"
+        );
+
+        console.log(
+            "Message:",
+            err.message
+        );
+
+        console.log(
+            "Code:",
+            err.code
+        );
+
+        console.log(
+            "Response:",
+            err.response
+        );
+
+        console.log(
+            "================================"
+        );
+
 
         res.status(500).json({
 
             message:
-                "Failed to send OTP",
-
-            error:
-                err.message
+                "Failed to send OTP"
 
         });
 
@@ -1564,7 +1580,7 @@ export const sendEmailOTP = async (req, res) => {
 
 
 // ======================================================
-// ==================== VERIFY EMAIL OTP ================
+// ==================== VERIFY OTP ======================
 // ======================================================
 
 export const verifyEmailOTP = async (req, res) => {
@@ -1576,7 +1592,14 @@ export const verifyEmailOTP = async (req, res) => {
 
     try {
 
-        if (!email || !otp) {
+        // ==================================================
+        // CHECK INPUT
+        // ==================================================
+
+        if (
+            !email ||
+            !otp
+        ) {
 
             return res.status(400).json({
 
@@ -1593,36 +1616,20 @@ export const verifyEmailOTP = async (req, res) => {
 
 
         const cleanOtp =
-            otp.trim();
+            otp.toString().trim();
 
 
         // ==================================================
-        // VALIDATE OTP LENGTH
-        // ==================================================
-
-        if (
-            cleanOtp.length !== 6 ||
-            !/^\d{6}$/.test(cleanOtp)
-        ) {
-
-            return res.status(400).json({
-
-                message:
-                    "OTP must be 6 digits"
-
-            });
-
-        }
-
-
-        // ==================================================
-        // GET LATEST OTP
+        // GET LATEST UNUSED OTP
         // ==================================================
 
         const codes =
             await getLatestVerificationCode(
+
                 cleanEmail,
+
                 "email_verification"
+
             );
 
 
@@ -1643,14 +1650,17 @@ export const verifyEmailOTP = async (req, res) => {
 
 
         // ==================================================
-        // CHECK OTP EXPIRY
+        // CHECK EXPIRY
         // ==================================================
 
         if (
+
             new Date() >
+
             new Date(
                 otpData.expires_at
             )
+
         ) {
 
             return res.status(400).json({
@@ -1679,8 +1689,10 @@ export const verifyEmailOTP = async (req, res) => {
         // ==================================================
 
         if (
+
             enteredHash !==
             otpData.code_hash
+
         ) {
 
             return res.status(400).json({
@@ -1694,7 +1706,7 @@ export const verifyEmailOTP = async (req, res) => {
 
 
         // ==================================================
-        // MARK OTP AS USED
+        // MARK OTP USED
         // ==================================================
 
         await markVerificationCodeUsed(
@@ -1703,13 +1715,17 @@ export const verifyEmailOTP = async (req, res) => {
 
 
         // ==================================================
-        // VERIFY USER EMAIL
+        // VERIFY USER
         // ==================================================
 
         await verifyUserEmail(
             cleanEmail
         );
 
+
+        // ==================================================
+        // SUCCESS
+        // ==================================================
 
         res.json({
 
@@ -1722,7 +1738,7 @@ export const verifyEmailOTP = async (req, res) => {
     catch (err) {
 
         console.log(
-            "VERIFY EMAIL OTP ERROR:",
+            "VERIFY OTP ERROR:",
             err
         );
 
@@ -1766,10 +1782,6 @@ export const forgotPassword = async (req, res) => {
             email.trim().toLowerCase();
 
 
-        // ==================================================
-        // FIND USER
-        // ==================================================
-
         const users =
             await findUserByEmail(
                 cleanEmail
@@ -1813,7 +1825,7 @@ export const forgotPassword = async (req, res) => {
 
 
         // ==================================================
-        // OTP EXPIRY
+        // EXPIRY
         // ==================================================
 
         const expiresAt =
@@ -1828,27 +1840,26 @@ export const forgotPassword = async (req, res) => {
         // ==================================================
 
         await saveVerificationCode(
+
             cleanEmail,
+
             codeHash,
+
             "password_reset",
+
             expiresAt
-        );
 
-
-        console.log(
-            "PASSWORD RESET OTP SAVED FOR:",
-            cleanEmail
         );
 
 
         // ==================================================
-        // SEND RESET EMAIL
+        // SEND EMAIL
         // ==================================================
 
         await transporter.sendMail({
 
             from:
-                `"Authentication App" <${process.env.SMTP_USER}>`,
+                `"Your App" <${process.env.SMTP_USER}>`,
 
             to:
                 cleanEmail,
@@ -1860,61 +1871,45 @@ export const forgotPassword = async (req, res) => {
 
                 <div style="
                     font-family: Arial, sans-serif;
+                    padding: 30px;
                     max-width: 600px;
                     margin: auto;
-                    padding: 30px;
-                    background: #f8fafc;
                 ">
 
-                    <div style="
-                        background: white;
-                        padding: 30px;
-                        border-radius: 12px;
-                        border: 1px solid #e5e7eb;
+                    <h2>
+                        Password Reset
+                    </h2>
+
+                    <p>
+                        Your password reset OTP is:
+                    </p>
+
+                    <h1 style="
+                        letter-spacing: 8px;
+                        text-align: center;
+                        font-size: 36px;
                     ">
 
-                        <h2>
-                            Password Reset
-                        </h2>
+                        ${otp}
 
-                        <p>
-                            Your password reset
-                            OTP is:
-                        </p>
+                    </h1>
 
-                        <h1 style="
-                            letter-spacing: 8px;
-                            text-align: center;
-                            font-size: 36px;
-                        ">
-                            ${otp}
-                        </h1>
+                    <p>
+                        This OTP will expire
+                        in 10 minutes.
+                    </p>
 
-                        <p>
-                            This OTP will expire
-                            in 10 minutes.
-                        </p>
-
-                        <p>
-                            If you did not request
-                            a password reset, you
-                            can safely ignore this
-                            email.
-                        </p>
-
-                    </div>
+                    <p>
+                        If you did not request
+                        a password reset, you can
+                        ignore this email.
+                    </p>
 
                 </div>
 
             `
 
         });
-
-
-        console.log(
-            "PASSWORD RESET EMAIL SENT TO:",
-            cleanEmail
-        );
 
 
         res.json({
@@ -1935,10 +1930,7 @@ export const forgotPassword = async (req, res) => {
         res.status(500).json({
 
             message:
-                "Failed to send reset OTP",
-
-            error:
-                err.message
+                "Failed to send reset OTP"
 
         });
 
@@ -1948,7 +1940,7 @@ export const forgotPassword = async (req, res) => {
 
 
 // ======================================================
-// ================ VERIFY PASSWORD OTP =================
+// ================ VERIFY PASSWORD OTP ================
 // ======================================================
 
 export const verifyPasswordOTP = async (req, res) => {
@@ -1960,7 +1952,10 @@ export const verifyPasswordOTP = async (req, res) => {
 
     try {
 
-        if (!email || !otp) {
+        if (
+            !email ||
+            !otp
+        ) {
 
             return res.status(400).json({
 
@@ -1977,26 +1972,7 @@ export const verifyPasswordOTP = async (req, res) => {
 
 
         const cleanOtp =
-            otp.trim();
-
-
-        // ==================================================
-        // VALIDATE OTP
-        // ==================================================
-
-        if (
-            cleanOtp.length !== 6 ||
-            !/^\d{6}$/.test(cleanOtp)
-        ) {
-
-            return res.status(400).json({
-
-                message:
-                    "OTP must be 6 digits"
-
-            });
-
-        }
+            otp.toString().trim();
 
 
         // ==================================================
@@ -2005,8 +1981,11 @@ export const verifyPasswordOTP = async (req, res) => {
 
         const codes =
             await getLatestVerificationCode(
+
                 cleanEmail,
+
                 "password_reset"
+
             );
 
 
@@ -2031,10 +2010,13 @@ export const verifyPasswordOTP = async (req, res) => {
         // ==================================================
 
         if (
+
             new Date() >
+
             new Date(
                 otpData.expires_at
             )
+
         ) {
 
             return res.status(400).json({
@@ -2063,8 +2045,10 @@ export const verifyPasswordOTP = async (req, res) => {
         // ==================================================
 
         if (
+
             enteredHash !==
             otpData.code_hash
+
         ) {
 
             return res.status(400).json({
@@ -2099,13 +2083,15 @@ export const verifyPasswordOTP = async (req, res) => {
 
 
         // ==================================================
-        // RESET TOKEN EXPIRY
+        // TOKEN EXPIRY
         // ==================================================
 
         const resetTokenExpires =
             new Date(
+
                 Date.now() +
                 10 * 60 * 1000
+
             );
 
 
@@ -2114,9 +2100,13 @@ export const verifyPasswordOTP = async (req, res) => {
         // ==================================================
 
         await saveResetToken(
+
             cleanEmail,
+
             resetTokenHash,
+
             resetTokenExpires
+
         );
 
 
@@ -2128,6 +2118,10 @@ export const verifyPasswordOTP = async (req, res) => {
             otpData.id
         );
 
+
+        // ==================================================
+        // SUCCESS
+        // ==================================================
 
         res.json({
 
@@ -2258,10 +2252,13 @@ export const resetPassword = async (req, res) => {
         // ==================================================
 
         if (
+
             new Date() >
+
             new Date(
                 user.reset_token_expires_at
             )
+
         ) {
 
             return res.status(400).json({
@@ -2290,8 +2287,10 @@ export const resetPassword = async (req, res) => {
         // ==================================================
 
         if (
+
             tokenHash !==
             user.reset_token_hash
+
         ) {
 
             return res.status(400).json({
@@ -2310,8 +2309,11 @@ export const resetPassword = async (req, res) => {
 
         const hashedPassword =
             await bcrypt.hash(
+
                 newPassword,
+
                 10
+
             );
 
 
@@ -2320,10 +2322,17 @@ export const resetPassword = async (req, res) => {
         // ==================================================
 
         await resetUserPassword(
+
             cleanEmail,
+
             hashedPassword
+
         );
 
+
+        // ==================================================
+        // SUCCESS
+        // ==================================================
 
         res.json({
 
@@ -2350,4 +2359,3 @@ export const resetPassword = async (req, res) => {
     }
 
 };
-
