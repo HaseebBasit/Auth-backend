@@ -1,36 +1,21 @@
 import pg from "pg";
-import dotenv from "dotenv";
-
-dotenv.config();
 
 const { Pool } = pg;
 
-const pool = new Pool({
-
+const db = new Pool({
     connectionString: process.env.DATABASE_URL,
-
     ssl: {
-        rejectUnauthorized: false,
-    },
-
+        rejectUnauthorized: false
+    }
 });
 
-pool
-    .connect()
-    .then((res) => {
-
-        console.log("Postgres DB connected successfully!");
-
-        res.release();
-
+db.connect()
+    .then((client) => {
+        console.log("PostgreSQL connected successfully!");
+        client.release();
     })
     .catch((err) => {
-
-        console.log(
-            "Err while connecting to postgres:",
-            err.message
-        );
-
+        console.log("PostgreSQL connection error:", err);
     });
 
-export default pool;
+export default db;

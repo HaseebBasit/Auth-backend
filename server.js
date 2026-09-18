@@ -1,17 +1,11 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-
 import routes from "./src/routes/routes.js";
 
 dotenv.config();
 
 const app = express();
-
-
-// ======================================================
-// ==================== MIDDLEWARE =======================
-// ======================================================
 
 app.use(
     cors({
@@ -36,25 +30,10 @@ app.use(
 
 app.use(express.json());
 
-
-// ======================================================
-// ==================== ROUTES ===========================
-// ======================================================
-
 app.use("/", routes);
 
-
-// ======================================================
-// ==================== START SERVER =====================
-// ======================================================
-
-const PORT =
-    process.env.PORT || 5050;
+const PORT = process.env.PORT || 5050;
 
 app.listen(PORT, () => {
-
-    console.log(
-        `Server is running on port ${PORT}`
-    );
-
+    console.log(`Server is running on port ${PORT}`);
 });
